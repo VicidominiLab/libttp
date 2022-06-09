@@ -1,5 +1,4 @@
 include README.md
 include LICENSE.md
-include ttp/*.py
-include ttpCython/*.pyx
-include ttpCython/*.py
+include libttp/*.py
+include libttp/*.pyx
