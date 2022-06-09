@@ -30,7 +30,7 @@ class build_ext(_build_ext):
 
 setup(
     name='libttp',
-    version='0.1.28',
+    version='0.1.33',
     url='https://github.com/VicidominiLab/libttp',
     license='CC-BY-NC-4.0',
     author='Mattia Donato',
@@ -38,10 +38,10 @@ setup(
     description='Libraries for reading the data from time-tagging module (BrightEyes-TTM, https://github.com/VicidominiLab/BrightEyes-TTM)',
     ext_modules=cythonize("libttp/ttpCython.pyx", compiler_directives={'language_level' : "3"}, include_path=[np.get_include()]),
     packages=find_packages(),
-    install_requires=['numpy', 'cython', 'matplotlib', 'pandas', 'tdqm', 'scipy'],
+    install_requires=['cython>=0.29.30', 'numpy>=1.22.0', 'matplotlib', 'pandas', 'tdqm', 'scipy'],
     include_dir=[np.get_include()],
     include_dirs=[np.get_include()],
-    setup_requires=['cython', 'numpy'],
+    setup_requires=['cython>=0.29.30', 'numpy>=1.22.0'],
     cmdclass={'build_ext': build_ext},
 )
 
