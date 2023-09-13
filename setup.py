@@ -30,7 +30,7 @@ class build_ext(_build_ext):
 
 setup(
     name='libttp',
-    version='0.1.35',
+    version='0.1.42',
     url='https://github.com/VicidominiLab/libttp',
     license='CC-BY-NC-4.0',
     author='Mattia Donato',
