@@ -11,7 +11,10 @@ def getLengthFileNewProtocol(filename,dtype=np.uint16):
     # bytes / (2 bytes/uint16)
     return int(stats.st_size // np.dtype(dtype).itemsize)
 
-def timeProcessNewProtocol(filename, CHANNELS=49, file_offset=0, file_last=-1):
+def timeProcessNewProtocol(filename, CHANNELS=49, file_offset=0, file_last=-1, tail_size=5):
+    cdef np.uint16_t tail_size_uint = tail_size
+    # tail_size_uint = EXTRA_INFO in the VHDL code
+    # the default is 5
     print(file_offset, file_last)
     print("File total size in", str(np.dtype(np.uint16)),"units:", getLengthFileNewProtocol(filename, dtype=np.uint16))
     if file_last==-1:
@@ -25,7 +28,7 @@ def timeProcessNewProtocol(filename, CHANNELS=49, file_offset=0, file_last=-1):
                        count=count)
     print("File read size in", str(np.dtype(np.uint16)),"units:",len(dataIn))         
     
-    cdef np.uint16_t MAXWORD=CHANNELS+5
+    cdef np.uint16_t MAXWORD=CHANNELS+tail_size_uint
     print("Channels:",CHANNELS)
     print("MAXWORD:",MAXWORD)
     
@@ -53,33 +56,70 @@ def timeProcessNewProtocol(filename, CHANNELS=49, file_offset=0, file_last=-1):
     
     current_pointer = 0
     length=len(dataIn)
-    for i in range(0,length):
-        if (ID_view[i]<CHANNELS):
-            dataout_view[current_pointer, ID_view[i] + MAXWORD*0 ] = ID_view[i]
-            dataout_view[current_pointer, ID_view[i] + MAXWORD*1 ] = valids_view[i]
-            dataout_view[current_pointer, ID_view[i] + MAXWORD*2 ] = data_view[i]
-        elif (ID_view[i]==123): #DUMMY
-            dataout_view[current_pointer, MAXWORD-5 + MAXWORD*0 ] = ID_view[i]
-            dataout_view[current_pointer, MAXWORD-5 + MAXWORD*1 ] = valids_view[i]
-            dataout_view[current_pointer, MAXWORD-5 + MAXWORD*2 ] = data_view[i]    
-        elif (ID_view[i]==124): #Laser
-            dataout_view[current_pointer, MAXWORD-4 + MAXWORD*0 ] = ID_view[i]
-            dataout_view[current_pointer, MAXWORD-4 + MAXWORD*1 ] = valids_view[i]
-            dataout_view[current_pointer, MAXWORD-4 + MAXWORD*2 ] = data_view[i]            
-        elif (ID_view[i]==125): #pixel, low step
-            dataout_view[current_pointer, MAXWORD-3 + MAXWORD*0 ] = ID_view[i]
-            dataout_view[current_pointer, MAXWORD-3 + MAXWORD*1 ] = valids_view[i]
-            dataout_view[current_pointer, MAXWORD-3 + MAXWORD*2 ] = data_view[i]
-        elif (ID_view[i]==126): #scan,  middle step
-            dataout_view[current_pointer, MAXWORD-2 + MAXWORD*0 ] = ID_view[i]
-            dataout_view[current_pointer, MAXWORD-2 + MAXWORD*1 ] = valids_view[i]
-            dataout_view[current_pointer, MAXWORD-2 + MAXWORD*2 ] = data_view[i]
-        elif (ID_view[i]==127): #line,  high step
-            dataout_view[current_pointer, MAXWORD-1 + MAXWORD*0 ] = ID_view[i]
-            dataout_view[current_pointer, MAXWORD-1 + MAXWORD*1 ] = valids_view[i]
-            dataout_view[current_pointer, MAXWORD-1 + MAXWORD*2 ] = data_view[i]
-
-            current_pointer=current_pointer+1
+    print("length",length)
+    print("tail_size_uint",tail_size_uint)
+    if tail_size_uint==5:
+        for i in range(0,length):
+            if (ID_view[i]<CHANNELS):
+                dataout_view[current_pointer, ID_view[i] + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, ID_view[i] + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, ID_view[i] + MAXWORD*2 ] = data_view[i]
+            elif (ID_view[i]==123): #DUMMY
+                dataout_view[current_pointer, MAXWORD-5 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-5 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-5 + MAXWORD*2 ] = data_view[i]    
+            elif (ID_view[i]==124): #Laser
+                dataout_view[current_pointer, MAXWORD-4 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-4 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-4 + MAXWORD*2 ] = data_view[i]            
+            elif (ID_view[i]==125): #pixel, low step
+                dataout_view[current_pointer, MAXWORD-3 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-3 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-3 + MAXWORD*2 ] = data_view[i]
+            elif (ID_view[i]==126): #scan,  middle step
+                dataout_view[current_pointer, MAXWORD-2 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-2 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-2 + MAXWORD*2 ] = data_view[i]
+            elif (ID_view[i]==127): #line,  high step
+                dataout_view[current_pointer, MAXWORD-1 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-1 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-1 + MAXWORD*2 ] = data_view[i]
+    
+                current_pointer=current_pointer+1        
+    elif tail_size_uint==6:
+        for i in range(0,length):
+            if (ID_view[i]<CHANNELS):
+                dataout_view[current_pointer, ID_view[i] + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, ID_view[i] + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, ID_view[i] + MAXWORD*2 ] = data_view[i]
+            elif (ID_view[i]==122): #DUMMY
+                dataout_view[current_pointer, MAXWORD-6 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-6 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-6 + MAXWORD*2 ] = data_view[i]                    
+            elif (ID_view[i]==123): #DUMMY
+                dataout_view[current_pointer, MAXWORD-5 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-5 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-5 + MAXWORD*2 ] = data_view[i]    
+            elif (ID_view[i]==124): #Laser
+                dataout_view[current_pointer, MAXWORD-4 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-4 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-4 + MAXWORD*2 ] = data_view[i]            
+            elif (ID_view[i]==125): #pixel, low step
+                dataout_view[current_pointer, MAXWORD-3 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-3 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-3 + MAXWORD*2 ] = data_view[i]
+            elif (ID_view[i]==126): #scan,  middle step
+                dataout_view[current_pointer, MAXWORD-2 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-2 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-2 + MAXWORD*2 ] = data_view[i]
+            elif (ID_view[i]==127): #line,  high step
+                dataout_view[current_pointer, MAXWORD-1 + MAXWORD*0 ] = ID_view[i]
+                dataout_view[current_pointer, MAXWORD-1 + MAXWORD*1 ] = valids_view[i]
+                dataout_view[current_pointer, MAXWORD-1 + MAXWORD*2 ] = data_view[i]
+    
+                current_pointer=current_pointer+1
+    else:
+        print("wrong tail_size = %d"%tail_size)
     return dataout[:current_pointer]
 
 
@@ -101,7 +141,7 @@ def timeProcessRAW(datapre, channel_number, verbose=False):
                         length, countGood, datapre_trim_len
         cdef bint last_ok
         cdef np.int64_t cumulative_step, last_timestamp_64_1, last_timestamp_64_2
-        cdef np.int_t theIndex
+        cdef np.int32_t theIndex
         length = len(datapre["t_L"])
 
         tL_v=np.zeros(length, dtype=int)
@@ -140,11 +180,11 @@ def timeProcessRAW(datapre, channel_number, verbose=False):
 
         cdef np.uint8_t [:]   t_L_view=np.asarray(datapre["t_L"])
         cdef np.uint8_t[:]   t_1_view=np.asarray(datapre[channel])
-        cdef np.uint16_t[:]  step_view=np.asarray(datapre["step"])
+        cdef np.uint64_t[:]  step_view=np.asarray(datapre["step"])
         cdef np.uint8_t[:]   valid_1_view=np.asarray(datapre[write_en_tdc_name])
         cdef np.uint8_t[:]   valid_L_view=np.asarray(datapre["valid_tdc_L"])
         cdef np.int64_t[:] cumulative_step_view=np.asarray(datapre["cumulativeStep"])
-        cdef np.int_t[:] theIndex_view = np.asarray(datapre.index.to_numpy())
+        cdef np.int32_t[:] theIndex_view = np.asarray(datapre.index.to_numpy().astype(np.int32))
 
 
 
@@ -228,7 +268,7 @@ def analysisForImg(dataframeInput, StepPerPixel_in, cumulativeStep):
     cdef np.uint8_t [:] line_enable_view = np.asarray(dataframeInput["line_enable"])
     cdef np.uint8_t [:] pixel_enable_view = np.asarray(dataframeInput["pixel_enable"])
     cdef np.int64_t [:] cumulative_step_view = np.asarray(cumulativeStep.astype(np.int64))
-    cdef np.int_t [:] theIndex_view = np.asarray(dataframeInput.index.to_numpy())
+    cdef np.int32_t [:] theIndex_view = np.asarray(dataframeInput.index.to_numpy().astype(np.int32))
     stepNewLine=cumulativeStep[0]
 
     print("Arrays copied into analysisForImg")
@@ -286,13 +326,14 @@ def analysisForImg(dataframeInput, StepPerPixel_in, cumulativeStep):
                 pbar.update(pbar_period)
                 pbar.set_description("Current frame: %d \t"%frame)
 
-        pixelCorr=int(int(step-stepNewLine)/StepPerPixel)
+        pixelCorr=abs(int((step-stepNewLine)//StepPerPixel))
+
         last_se=se
         last_le=le
-        arr_px_v[n]=pixel
-        arr_px_corr_v[n]=pixelCorr
-        arr_py_v[n]=line
-        arr_frame_v[n]=frame
+        arr_px_v[n]=pixel  & 0xFFFF
+        arr_px_corr_v[n]=pixelCorr & 0xFFFF
+        arr_py_v[n]=line & 0xFFFF
+        arr_frame_v[n]=frame & 0xFFFF
         arr_index_v[n]=myindex
 
 

@@ -143,57 +143,74 @@ def readParsedFilePANDAS(filenameIn="~/data-2020-06-26-Test1/data-1593175269.547
 def getLengthFileNewProtocol(filename,dtype=np.uint16):
     return ttpCython.getLengthFileNewProtocol(filename,dtype)
 
-def readNewProtocolFileToPandas(filenameIn="~/blabla.ttr", reorder_channels=False, CHANNELS=49, force_16bit_step=True, extract_failsafe=False, file_offset=0, file_last=-1):
-    d=ttpCython.timeProcessNewProtocol(filenameIn, CHANNELS=CHANNELS, file_offset=file_offset, file_last=file_last)
+def readNewProtocolFileToPandas(filenameIn="~/blabla.ttr", reorder_channels=False, CHANNELS=49, force_16bit_step=True, extract_failsafe=False, file_offset=0, file_last=-1, tail_size=5, ignore_8th_bit=False, invert_line_scan=False):
+    d=ttpCython.timeProcessNewProtocol(filenameIn, CHANNELS=CHANNELS, file_offset=file_offset, file_last=file_last, tail_size=tail_size)
     print("data read")
 
-    df=pd.DataFrame(d, columns=["id_%d"%k for k in range(0,CHANNELS+5)] +
-                                   ["valid_tdc_%d"%k for k in range(0,CHANNELS+5)] +
-                                   ["t_%d"%k for k in range(0,CHANNELS+5)], copy=False)
+    df=pd.DataFrame(d, columns=["id_%d"%k for k in range(0,CHANNELS+tail_size)] +
+                                   ["valid_tdc_%d"%k for k in range(0,CHANNELS+tail_size)] +
+                                   ["t_%d"%k for k in range(0,CHANNELS+tail_size)], copy=False)
+
+    if ignore_8th_bit is True:
+        print("ignore_8th_bit is True")
+        for ch in range(CHANNELS):
+            df["t_%d"%ch] = df["t_%d"%ch] & 0x7F
+    
     print("i) added column")
     # d=[]
-    df.rename(inplace=True, columns={"valid_tdc_%d"%(CHANNELS+5-5): "valid_dummy",
-                                     "valid_tdc_%d"%(CHANNELS+5-4): "valid_tdc_L",
-                                     "valid_tdc_%d"%(CHANNELS+5-3): "valid_%d"%(CHANNELS+5-3),
-                                     "valid_tdc_%d"%(CHANNELS+5-2): "valid_%d"%(CHANNELS+5-2),
-                                     "valid_tdc_%d"%(CHANNELS+5-1): "valid_%d"%(CHANNELS+5-1),
-                                     "t_%d"%(CHANNELS+5-5): "dummy",
-                                     "t_%d"%(CHANNELS+5-4): "t_L",
-                                     "t_%d"%(CHANNELS+5-3): "data_%d"%(CHANNELS+5-3),
-                                     "t_%d"%(CHANNELS+5-2): "data_%d"%(CHANNELS+5-2),
-                                     "t_%d"%(CHANNELS+5-1): "data_%d"%(CHANNELS+5-1)                  
+    df.rename(inplace=True, columns={"valid_tdc_%d"%(CHANNELS+tail_size-5): "valid_dummy",
+                                     "valid_tdc_%d"%(CHANNELS+tail_size-4): "valid_tdc_L",
+                                     "valid_tdc_%d"%(CHANNELS+tail_size-3): "valid_%d"%(CHANNELS+tail_size-3),
+                                     "valid_tdc_%d"%(CHANNELS+tail_size-2): "valid_%d"%(CHANNELS+tail_size-2),
+                                     "valid_tdc_%d"%(CHANNELS+tail_size-1): "valid_%d"%(CHANNELS+tail_size-1),
+                                     "t_%d"%(CHANNELS+tail_size-5): "dummy",
+                                     "t_%d"%(CHANNELS+tail_size-4): "t_L",
+                                     "t_%d"%(CHANNELS+tail_size-3): "data_%d"%(CHANNELS+tail_size-3),
+                                     "t_%d"%(CHANNELS+tail_size-2): "data_%d"%(CHANNELS+tail_size-2),
+                                     "t_%d"%(CHANNELS+tail_size-1): "data_%d"%(CHANNELS+tail_size-1)                  
                       })
 
     print("ii) added pixel, line, frame")
-    df["pixel_enable"] = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+5-3)] , 0b1000_0000), 7)#// 0b1000_0000
-    df["scan_enable"]  = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+5-2)] , 0b1000_0000), 7)#// 0b1000_0000
-    df["line_enable"]  = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+5-1)] , 0b1000_0000), 7)#// 0b1000_0000
+    if invert_line_scan is True:
+        df["pixel_enable"]     = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-3)] , 0b1000_0000), 7)#// 0b1000_0000
+        df["scan_enable"]      = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-2)] , 0b1000_0000), 7)#// 0b1000_0000
+        df["line_enable"]      = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-1)] , 0b1000_0000), 7)#// 0b1000_0000
+    else:
+        df["pixel_enable"]     = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-3)] , 0b1000_0000), 7)#// 0b1000_0000
+        df["line_enable"]      = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-2)] , 0b1000_0000), 7)#// 0b1000_0000
+        df["scan_enable"]      = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-1)] , 0b1000_0000), 7)#// 0b1000_0000
+        
     print("iii) added 'steps' bytes")
 
-    if extract_failsafe:
-        failsafe = np.right_shift(np.bitwise_and(df["dummy"], 0b1000_0000), 7)    
-        df["failsafe"]= failsafe
-        failsafe2 = np.right_shift(np.bitwise_and(df["dummy"], 0b0100_0000), 6)    
-        df["failsafe2"]= failsafe2
-        print("failsafe, failsafe2 flag added")
+    # if extract_failsafe:
+    failsafe = np.right_shift(np.bitwise_and(df["dummy"], 0b1000_0000), 7)
+    df["failsafe"]= failsafe
+    no_channels_hit = np.right_shift(np.bitwise_and(df["dummy"], 0b0100_0000), 6)
+    df["no_channels_hit"]= no_channels_hit
+    print("failsafe, no_channels_hit flag added")
+    
+    if tail_size==6:
+        step_E = np.bitwise_and(df["t_%d"%(CHANNELS+tail_size-6)].astype(np.uint64), 0b1111_1111)
+    else: 
+        step_E = 0
+    step_D =     np.bitwise_and(df["dummy"].astype(np.uint64), 0b0011_1111)
+    step_C =     np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-1)].astype(np.uint64), 0b0111_1111)
+    step_B =     np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-2)].astype(np.uint64), 0b0111_1111)
+    step_A =     np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-3)].astype(np.uint64), 0b0111_1111)
 
-    step_D =  np.bitwise_and(df["dummy"], 0b0011_1111)    
-    step_C =  np.bitwise_and(df["data_%d"%(CHANNELS+5-1)], 0b0111_1111)    
-    step_B =  np.bitwise_and(df["data_%d"%(CHANNELS+5-2)], 0b0111_1111)
-    step_A =  np.bitwise_and(df["data_%d"%(CHANNELS+5-3)], 0b0111_1111)
-
-    if force_16bit_step:
+    if force_16bit_step==True:
         step_C =  np.bitwise_and(step_C, 0b0000_0011)
-        df["step"] = np.left_shift(step_C.astype(np.uint16),14) + \
-                     np.left_shift(step_B.astype(np.uint16),7) + \
-                                   step_A.astype(np.uint16)
+        df["step"] = np.left_shift(step_C.astype(np.uint64),14) + \
+                     np.left_shift(step_B.astype(np.uint64),7) + \
+                                   step_A.astype(np.uint64)
         print("         assume step 16-bit long")
     else:
-        df["step"]= np.left_shift(step_D.astype(np.uint32),21) + \
-                    np.left_shift(step_C.astype(np.uint32),14) + \
-                    np.left_shift(step_B.astype(np.uint32),7)  + \
-                                  step_A.astype(np.uint32)
-        print("         assume step 28-bit long")
+        df["step"]= (np.left_shift(step_E,27) +  
+                     np.left_shift(step_D,21) + 
+                     np.left_shift(step_C,14) + 
+                     np.left_shift(step_B,7)  + 
+                                   step_A)
+        print("         assume step 34-bit long")
     print("iv) calculate 'step'")
 
     print(df.keys())
@@ -695,16 +712,23 @@ def convertFromPandasDataFrame(dfINPUT,filenameOutputHDF5 = "/dev/shm/preview-ra
     myReturn = {}
     
     print("Calculate rates ")
-    
-    print("Calculate cumulative step ")
-    diffStep = np.append([0], np.diff(
-        dfINPUT["step"] * 1.))  # the diff calculate the i[n+1]-i[n] so for realign I add a 0 as first cell of the array
-    sumStep = np.cumsum((diffStep < 0) * (step_max*1.))
-    # cumulativeStep=dfINPUT["step"]*1.-dfINPUT["step"][0]*1. +sumStep
-    cumulativeStep = dfINPUT["step"] * 1. + sumStep
-    cumulativeStep = np.asarray(cumulativeStep, dtype=np.int64)
-    print("Add cumulativeStep")
-    dfINPUT["cumulativeStep"] = cumulativeStep
+
+    if step_max == None:
+        print("step_max=NONE")
+        print("Calculate cumulativestep ")
+        print("...copied cumulativeStep to step")        
+        cumulativeStep = np.asarray(dfINPUT["step"], dtype=np.int64)
+        dfINPUT["cumulativeStep"] = cumulativeStep 
+    else:
+        print("Calculate cumulative step ")
+        diffStep = np.append([0], np.diff(
+            dfINPUT["step"] * 1.))  # the diff calculate the i[n+1]-i[n] so for realign I add a 0 as first cell of the array
+        sumStep = np.cumsum((diffStep < 0) * (step_max*1.))
+        # cumulativeStep=dfINPUT["step"]*1.-dfINPUT["step"][0]*1. +sumStep
+        cumulativeStep = dfINPUT["step"] * 1. + sumStep
+        cumulativeStep = np.asarray(cumulativeStep, dtype=np.int64)
+        print("Add cumulativeStep")
+        dfINPUT["cumulativeStep"] = cumulativeStep
     
     
     full_time_s = (cumulativeStep[-1]-cumulativeStep[0]) / (sysclk_MHz * 1e6)
@@ -1057,8 +1081,11 @@ def convertDataRAW(filenameToRead, fileInputRAW=False, sysclk_MHz=240., laser_MH
 
 
 
-def binwidth_normalized(counts):
-    bin_width_normalized=counts/np.sum(counts)
+def binwidth_normalized(counts, sum_counts=-1):
+    if sum_counts>0:
+        bin_width_normalized=counts/np.sum(sum_counts)
+    else:
+        bin_width_normalized=counts/np.sum(counts)
     
     time=np.zeros(bin_width_normalized.size)
     for i in range(0,bin_width_normalized.size):    
@@ -1066,24 +1093,35 @@ def binwidth_normalized(counts):
     return time
     
 
-def calculateCalibFromH5(filenameH5, listChannel, plots=False, return_numeric_channels=False):
+def calculateCalibFromH5(filenameH5, listChannel, plots=False, return_numeric_channels=False, maxbin=150, use_overflow_flag=False, remove_extrabit=False):
     """
 
     Return:          calibDict
     """    
+
+    
+    if use_overflow_flag is True:
+        overflow_bin = 127
+    else:
+        overflow_bin = None
+
     
     for ch in tqdm.tqdm(listChannel):
         try:
             h_ch_0=pd.read_hdf(filenameH5, key="ch_%d"%ch)
         except:            
             continue
-        h_main=pd.read_hdf(filenameH5, key="main")
+        h_main=pd.read_hdf(filenameH5, key="main")        
         df = pd.merge(h_ch_0, h_main, how="inner", left_index=True, right_index=True, validate="one_to_one", suffixes=["","_right"])
         d_ch_0 = df 
         dt=df["t_L"].astype(int)
+        
+        if remove_extrabit==True:
+            dt[dt>127] = dt[dt>127] - 128
+            
         data_t = dt
 
-        h=np.histogram(data_t, range=[0,150],bins=150)
+        h=np.histogram(data_t, range=[0,maxbin],bins=maxbin)
         bins=h[1]
         counts=h[0]
         if plots==True:
@@ -1091,7 +1129,7 @@ def calculateCalibFromH5(filenameH5, listChannel, plots=False, return_numeric_ch
             plt.bar(bins[:-1],counts,width=1)
             plt.title("ch_L")
         calibDict={}
-        calibDict["ch_L"]=binwidth_normalized(counts)
+        calibDict["ch_L"]=binwidth_normalized(counts, sum(counts[:overflow_bin]))
         print("ch_L calculated from ch_%d" % ch)
         break      
 
@@ -1105,10 +1143,14 @@ def calculateCalibFromH5(filenameH5, listChannel, plots=False, return_numeric_ch
         h_main=pd.read_hdf(filenameH5, key="main")
         df = pd.merge(h_ch_0, h_main, how="inner", left_index=True, right_index=True, validate="one_to_one", suffixes=["","_right"])
         data_t = df["t_%d"%ch].astype(int)
-        h=np.histogram(data_t, range=[0,150],bins=150)
+
+        if remove_extrabit==True:
+            data_t[data_t>127] = dt[dt>127] - 128
+                    
+        h=np.histogram(data_t, range=[0,maxbin],bins=maxbin)
         bins=h[1]
         counts=h[0]
-        calibDict["ch_%d"%ch]=binwidth_normalized(counts)
+        calibDict["ch_%d"%ch]=binwidth_normalized(counts, sum(counts[:overflow_bin]))
         channels_done.append(ch)
         if plots==True:
             plt.figure()
