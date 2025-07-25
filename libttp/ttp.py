@@ -151,10 +151,7 @@ def readNewProtocolFileToPandas(filenameIn="~/blabla.ttr", reorder_channels=Fals
                                    ["valid_tdc_%d"%k for k in range(0,CHANNELS+tail_size)] +
                                    ["t_%d"%k for k in range(0,CHANNELS+tail_size)], copy=False)
 
-    if ignore_8th_bit is True:
-        print("ignore_8th_bit is True")
-        for ch in range(CHANNELS):
-            df["t_%d"%ch] = df["t_%d"%ch] & 0x7F
+
     
     print("i) added column")
     # d=[]
@@ -170,6 +167,12 @@ def readNewProtocolFileToPandas(filenameIn="~/blabla.ttr", reorder_channels=Fals
                                      "t_%d"%(CHANNELS+tail_size-1): "data_%d"%(CHANNELS+tail_size-1)                  
                       })
 
+    if ignore_8th_bit is True:
+        print("ignore_8th_bit is True")
+        df["t_L"] = df["t_L"] & 0x7F
+        for ch in range(CHANNELS):
+            df["t_%d"%ch] = df["t_%d"%ch] & 0x7F
+    
     print("ii) added pixel, line, frame")
     if invert_line_scan is True:
         df["pixel_enable"]     = np.right_shift(np.bitwise_and(df["data_%d"%(CHANNELS+tail_size-3)] , 0b1000_0000), 7)#// 0b1000_0000
@@ -686,7 +689,7 @@ def convertFromPandasDataFrame(dfINPUT,filenameOutputHDF5 = "/dev/shm/preview-ra
                list_of_channels=np.arange(0, 21),
                autoCalibration=True, kC4=45., textInPlot="", ignorePixelLineFrame=False,
                makePlots=False, compressionLevel=0, fitEnable=False, metadata={},
-               coincidence_analysis=False,
+               coincidence_analysis=False, add_failsafe=False,
                destinationFolder="", chunk_start=None, chunk_stop=None, step_max=65536):
     """
 
@@ -763,6 +766,8 @@ def convertFromPandasDataFrame(dfINPUT,filenameOutputHDF5 = "/dev/shm/preview-ra
     dfOUTPUT = pd.DataFrame()
     dfOUTPUT["total_photon"] = totalphotons.astype(np.uint8)
     dfOUTPUT["cumulative_step"] = cumulativeStep
+    if add_failsafe:
+        dfOUTPUT["failsafe"] = dfINPUT["failsafe"]
     # dfOUTPUT["sysclk_period_ps"]=sysclk_ps
 
     if coincidence_analysis==True:
